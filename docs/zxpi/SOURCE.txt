@@ -1,0 +1,3 @@
+zxPluginsInject.dylib is built from modules/zxPluginsInject in
+https://github.com/SideloadLabs/EeveeSpotifyReincarnated at commit 9b32d81073daaec4dfb47ff5b6fc63a25e0bf16f
+License: GPL-3.0, source available at that commit.
