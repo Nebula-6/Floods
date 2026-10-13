@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const files = { ipa: null, eevee: null, chroma: null };
-const worker = new Worker("worker.js?v=202610131703");
+const worker = new Worker("worker.js?v=202610131705");
 let ready = false;
 let busy = false;
 let downloadUrl = null;
@@ -59,7 +59,7 @@ function jobOptions(dryRun) {
     name: $("name").value.trim(),
     bundleId: $("bundle").value.trim(),
     stripExtensions: $("strip").checked,
-    sideloadFix: $("fix").checked,
+    sideloadFix: $("target").value === "signed",
     force: $("force").checked,
     dryRun,
     compress: 1,

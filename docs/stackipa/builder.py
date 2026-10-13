@@ -366,7 +366,7 @@ def run(options, work, lines):
         prepared.insert(0, ("zxpi", *prepare_dylib(fix_source, stage, injected_names, lines)))
         say(lines, "sideload fix (keychain and App Group) will be loaded first")
     else:
-        say(lines, "warning: no sideload fix, logging in may fail on a re-signed app")
+        say(lines, "no sideload fix added (right for LiveContainer, needed when you sign with your own certificate)")
 
     framework_images = []
     framework_sources = {}
