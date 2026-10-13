@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stack IPA</title>
-<link rel="stylesheet" href="style.css?v=202610131647">
+<link rel="stylesheet" href="style.css?v=202610131703">
 </head>
 <body>
 <main>
@@ -36,7 +36,7 @@
     </label>
     <label class="row"><span>Download relay <small>optional, use {url} for the address</small></span><input type="text" id="relay" placeholder="https://example.com/?url={url}"></label>
     <label class="row"><span>App name</span><input type="text" id="name" placeholder="Spotify"></label>
-    <label class="row"><span>Bundle ID</span><input type="text" id="bundle" placeholder="leave empty to keep"></label>
+    <label class="row"><span>Bundle ID <small>must match your signing App ID if the app asks</small></span><input type="text" id="bundle" placeholder="leave empty to keep"></label>
     <label class="row"><span>Load order</span>
       <select id="order">
         <option value="eevee,chroma">Eevee first, then Chroma</option>
@@ -60,6 +60,6 @@
 
   <p class="fine">Use only apps and files you are entitled to use. Chroma and EeveeSpotify are third-party projects with their own licenses and are not bundled here. Sign the result yourself with SideStore, Sideloadly or similar.</p>
 </main>
-<script src="app.js?v=202610131647"></script>
+<script src="app.js?v=202610131703"></script>
 </body>
 </html>

@@ -166,6 +166,27 @@ def patch_extensions(archive, app, stage, dylib_name, lines):
     return patched
 
 
+def retarget_extensions(archive, app, old_id, new_id, stage, lines):
+    changed = []
+    pattern = re.compile("^" + re.escape(app) + r"PlugIns/([^/]+\.appex)/Info\.plist$")
+    for entry in archive.namelist():
+        match = pattern.match(entry)
+        if not match:
+            continue
+        info = plistlib.loads(archive.read(entry))
+        current = info.get("CFBundleIdentifier", "")
+        if not current.startswith(old_id + "."):
+            continue
+        info["CFBundleIdentifier"] = new_id + current[len(old_id):]
+        path = os.path.join(stage, "extplist", match.group(1) + ".plist")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as out:
+            out.write(plistlib.dumps(info, fmt=plistlib.FMT_XML))
+        changed.append((entry, path))
+        say(lines, f"{match.group(1)}: bundle id {current} -> {info['CFBundleIdentifier']}")
+    return changed
+
+
 def required_extras(images):
     needed = []
     for image in images:
@@ -396,6 +417,10 @@ def run(options, work, lines):
     if fix_name and not options.strip_extensions:
         extension_files = patch_extensions(archive, app, stage, fix_name, lines)
 
+    plist_extra = []
+    if options.bundle_id and not options.strip_extensions:
+        plist_extra = retarget_extensions(archive, app, info.get("CFBundleIdentifier", ""), options.bundle_id, stage, lines)
+
     plist_bytes = patch_plist(archive.read(app + "Info.plist"), options, "chroma" in tweaks, lines)
 
     replaced = {app + "Info.plist", app + executable}
@@ -404,6 +429,8 @@ def run(options, work, lines):
         additions.append((f"{app}Frameworks/{os.path.basename(path)}", path, True))
     for entry_name, path in extension_files:
         additions.append((entry_name, path, True))
+    for entry_name, path in plist_extra:
+        additions.append((entry_name, path, False))
     for name, fw in framework_sources.items():
         for relative, full in walk_files(fw):
             if relative.startswith("Modules/") or relative.endswith((".swiftmodule", ".swiftdoc", ".swiftinterface")):
