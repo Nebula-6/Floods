@@ -12,7 +12,7 @@ function log(line) {
 }
 
 function refresh() {
-  const usable = ready && !busy && files.ipa && (files.eevee || files.chroma);
+  const usable = ready && !busy && files.ipa && ($("use-eevee").checked || $("use-chroma").checked);
   $("check").disabled = !usable;
   $("build").disabled = !usable;
 }
@@ -57,9 +57,18 @@ function start(dryRun) {
   setBusy(true);
   worker.postMessage({
     type: "build",
-    job: { ipa: files.ipa, eevee: files.eevee, chroma: files.chroma, options: jobOptions(dryRun) },
+    job: {
+      ipa: files.ipa,
+      eevee: files.eevee,
+      chroma: files.chroma,
+      include: { eevee: $("use-eevee").checked, chroma: $("use-chroma").checked },
+      relay: $("relay").value.trim(),
+      options: jobOptions(dryRun),
+    },
   });
 }
+
+for (const id of ["use-eevee", "use-chroma"]) $(id).addEventListener("change", refresh);
 
 $("check").addEventListener("click", () => start(true));
 $("build").addEventListener("click", () => start(false));

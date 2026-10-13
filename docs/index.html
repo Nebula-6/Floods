@@ -9,7 +9,7 @@
 <body>
 <main>
   <h1>Stack IPA</h1>
-  <p class="lede">Combine your own Spotify IPA with the EeveeSpotify and Chroma tweak packages. Everything runs in this page. Nothing is uploaded.</p>
+  <p class="lede">Choose your decrypted Spotify IPA. The page downloads EeveeSpotify and Chroma, checks them against pinned official checksums, and builds one IPA. Your IPA never leaves this device.</p>
 
   <section class="card">
     <label class="pick">
@@ -17,6 +17,13 @@
       <input type="file" id="ipa" accept=".ipa,.zip">
       <em id="ipa-name">Choose file</em>
     </label>
+    <label class="check"><input type="checkbox" id="use-eevee" checked> EeveeSpotify 7.0.0, downloaded and verified automatically</label>
+    <label class="check"><input type="checkbox" id="use-chroma" checked> Chroma 0.50.0, downloaded and verified automatically</label>
+  </section>
+
+  <details class="card">
+    <summary>Options</summary>
+    <p class="fine">Use your own .deb files instead of the automatic download:</p>
     <label class="pick">
       <span>EeveeSpotify <small>.deb</small></span>
       <input type="file" id="eevee" accept=".deb">
@@ -27,10 +34,7 @@
       <input type="file" id="chroma" accept=".deb">
       <em id="chroma-name">Choose file</em>
     </label>
-  </section>
-
-  <details class="card">
-    <summary>Options</summary>
+    <label class="row"><span>Download relay <small>optional, use {url} for the address</small></span><input type="text" id="relay" placeholder="https://example.com/?url={url}"></label>
     <label class="row"><span>App name</span><input type="text" id="name" placeholder="Spotify"></label>
     <label class="row"><span>Bundle ID</span><input type="text" id="bundle" placeholder="leave empty to keep"></label>
     <label class="row"><span>Load order</span>

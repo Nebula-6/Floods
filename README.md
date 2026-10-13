@@ -4,7 +4,9 @@ Combines a Spotify IPA you supply with the EeveeSpotify and Chroma tweak package
 
 ## Web page
 
-Settings, Pages, Source: Deploy from a branch, pick this branch and the `/docs` folder. Open the published page, choose the three files, tap Check files, then Build IPA, then Download IPA. Sign the result with your usual sideloading tool.
+Settings, Pages, Source: Deploy from a branch, pick this branch and the `/docs` folder. Open the published page, choose your Spotify IPA, tap Check files, then Build IPA, then Download IPA. The page downloads EeveeSpotify and Chroma itself through a public CORS relay and refuses any file whose SHA-256 differs from the pinned official release in `docs/pins.json`. If every relay fails, pick your own .deb files under Options. Sign the result with your usual sideloading tool.
+
+Browsers cannot read GitHub release downloads directly, which is why a relay is used. To move to newer releases, update the URLs and hashes in `docs/pins.json`.
 
 ## Command line
 

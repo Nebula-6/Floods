@@ -44,7 +44,45 @@ async function stageExtras() {
   }
 }
 
+async function sha256(buffer) {
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function fetchPinned(key, pin, relays) {
+  for (const relay of relays) {
+    const address = relay.replace("{url}", encodeURIComponent(pin.url));
+    const host = new URL(address).host;
+    post("status", `Downloading ${pin.label} via ${host}`);
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60000);
+      const response = await fetch(address, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      clearTimeout(timer);
+      if ((await sha256(buffer)) !== pin.sha256) throw new Error("checksum did not match the official release");
+      post("log", `${pin.label}: downloaded and verified via ${host}`);
+      return new Blob([buffer]);
+    } catch (error) {
+      post("log", `${pin.label}: ${host} failed (${error.message || error})`);
+    }
+  }
+  throw new Error(`could not download ${pin.label}; choose the .deb file yourself instead`);
+}
+
+async function resolveDeb(key, supplied, job) {
+  if (!job.include[key]) return null;
+  if (supplied) return supplied;
+  const response = await fetch("pins.json", { cache: "no-cache" });
+  const pins = await response.json();
+  const relays = (job.relay ? [job.relay] : []).concat(pins.relays);
+  return fetchPinned(key, pins[key], relays);
+}
+
 async function build(job) {
+  job.eevee = await resolveDeb("eevee", job.eevee, job);
+  job.chroma = await resolveDeb("chroma", job.chroma, job);
   ensureDir("/in");
   ensureDir("/out");
   const blobs = [{ name: "spotify.ipa", data: job.ipa }];
