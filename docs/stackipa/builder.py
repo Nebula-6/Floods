@@ -213,6 +213,40 @@ def add_file(archive, name, source, executable, compress):
         shutil.copyfileobj(src, dst, CHUNK)
 
 
+def copy_raw(source, entry, out):
+    if entry.flag_bits & 0x1 or entry.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+        return False
+    info = zipfile.ZipInfo(entry.filename, entry.date_time)
+    info.compress_type = entry.compress_type
+    info.external_attr = entry.external_attr
+    info.create_system = entry.create_system
+    info.flag_bits = entry.flag_bits & 0x800
+    info.CRC = entry.CRC
+    info.compress_size = entry.compress_size
+    info.file_size = entry.file_size
+    fp = source.fp
+    fp.seek(entry.header_offset)
+    local = fp.read(30)
+    if len(local) != 30 or local[:4] != b"PK\x03\x04":
+        return False
+    name_len, extra_len = struct.unpack("<HH", local[26:30])
+    fp.seek(entry.header_offset + 30 + name_len + extra_len)
+    info.header_offset = out.fp.tell()
+    out.fp.write(info.FileHeader(zip64=entry.file_size >= zipfile.ZIP64_LIMIT or entry.compress_size >= zipfile.ZIP64_LIMIT))
+    remaining = entry.compress_size
+    while remaining:
+        chunk = fp.read(min(CHUNK, remaining))
+        if not chunk:
+            raise BuildError(f"{entry.filename}: archive is truncated")
+        out.fp.write(chunk)
+        remaining -= len(chunk)
+    out.filelist.append(info)
+    out.NameToInfo[info.filename] = info
+    out.start_dir = out.fp.tell()
+    out._didModify = True
+    return True
+
+
 def build(options):
     lines = []
     if not (options.eevee or options.chroma):
@@ -357,6 +391,8 @@ def run(options, work, lines):
                     continue
                 if any(entry.filename.startswith(p) for p in skip_prefixes):
                     continue
+                if copy_raw(archive, entry, out):
+                    continue
                 copy = zipfile.ZipInfo(entry.filename, entry.date_time)
                 copy.compress_type = entry.compress_type
                 copy.external_attr = entry.external_attr
@@ -371,6 +407,7 @@ def run(options, work, lines):
             plist_info.external_attr = 0o100644 << 16
             out.writestr(plist_info, plist_bytes)
             add_file(out, app + executable, exe_path, True, options.compress)
+            os.remove(exe_path)
             for name, full, executable_flag in additions:
                 add_file(out, name, full, executable_flag, options.compress)
         os.replace(out_tmp, options.output)
