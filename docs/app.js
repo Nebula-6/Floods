@@ -11,10 +11,23 @@ function log(line) {
   box.scrollTop = box.scrollHeight;
 }
 
+function included(key) {
+  return $(`use-${key}`).checked || Boolean(files[key]);
+}
+
+function hint() {
+  if (!ready) return "Waiting for the Python runtime to load.";
+  if (busy) return "Working. Buttons come back when it finishes.";
+  if (!files.ipa) return "Choose your Spotify IPA first.";
+  if (!included("eevee") && !included("chroma")) return "Tick Eevee or Chroma, or choose a .deb file under Options.";
+  return "";
+}
+
 function refresh() {
-  const usable = ready && !busy && files.ipa && ($("use-eevee").checked || $("use-chroma").checked);
+  const usable = hint() === "";
   $("check").disabled = !usable;
   $("build").disabled = !usable;
+  $("hint").textContent = hint();
 }
 
 function setBusy(value) {
@@ -34,6 +47,7 @@ for (const key of Object.keys(files)) {
     files[key] = file;
     $(`${key}-name`).textContent = file ? file.name : "Choose file";
     event.target.closest(".pick").classList.toggle("chosen", Boolean(file));
+    if (file && key !== "ipa") $(`use-${key}`).checked = true;
     resetDownload();
     refresh();
   });
@@ -61,7 +75,7 @@ function start(dryRun) {
       ipa: files.ipa,
       eevee: files.eevee,
       chroma: files.chroma,
-      include: { eevee: $("use-eevee").checked, chroma: $("use-chroma").checked },
+      include: { eevee: included("eevee"), chroma: included("chroma") },
       relay: $("relay").value.trim(),
       options: jobOptions(dryRun),
     },
