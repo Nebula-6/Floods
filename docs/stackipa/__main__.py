@@ -22,6 +22,7 @@ def parse(argv):
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--compress", type=int, default=6, choices=range(0, 10))
     parser.add_argument("--work-dir")
+    parser.add_argument("--sideload-fix")
     return parser.parse_args(argv)
 
 
@@ -43,6 +44,7 @@ def main(argv=None):
         dry_run=args.dry_run,
         compress=args.compress,
         work_dir=args.work_dir,
+        sideload_fix=args.sideload_fix,
     )
     try:
         build(options)

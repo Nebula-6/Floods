@@ -23,5 +23,5 @@ Either tweak can be given alone for a staged test. `--dry-run` checks everything
 
 - The IPA must be decrypted and the main executable thin arm64.
 - Chroma builds name the Spotify versions they were made for; a mismatch stops the build unless forced.
-- The sideload keychain and App Group fix that Eevee's own workflow adds is not included, and neither is Chroma's Live Activity extension.
+- The sideload keychain and App Group fix is built from Eevee source by the "Build sideload fix" workflow into docs/zxpi and added by default. Chroma's Live Activity extension is not included.
 - Orion and CydiaSubstrate frameworks are downloaded from the pinned pyzule-rw commit and checked against SHA-256 hashes.

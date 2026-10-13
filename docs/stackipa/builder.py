@@ -53,6 +53,7 @@ class Options:
     dry_run: bool = False
     compress: int = 6
     work_dir: str = None
+    sideload_fix: str = None
 
 
 def say(lines, text):
@@ -135,6 +136,34 @@ def prepare_dylib(source, stage, injected, lines):
         say(lines, f"  {name}: removed {removed} jailbreak rpath(s)")
     image.commit()
     return path, MachO(path)
+
+
+def patch_extensions(archive, app, stage, dylib_name, lines):
+    patched = []
+    pattern = re.compile("^" + re.escape(app) + r"PlugIns/([^/]+\.appex)/Info\.plist$")
+    for entry in archive.namelist():
+        match = pattern.match(entry)
+        if not match:
+            continue
+        folder = f"{app}PlugIns/{match.group(1)}/"
+        name = plistlib.loads(archive.read(entry)).get("CFBundleExecutable")
+        if not name or folder + name not in archive.namelist():
+            continue
+        path = os.path.join(stage, "ext", match.group(1), name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with archive.open(folder + name) as src, open(path, "wb") as dst:
+            shutil.copyfileobj(src, dst, CHUNK)
+        try:
+            if is_fat(path) or not is_macho64(path):
+                raise MachOError("not a thin arm64 binary")
+            prepare_for_injection(path, [f"@rpath/{dylib_name}"], rpaths=("@executable_path/../../Frameworks",))
+        except MachOError as error:
+            say(lines, f"warning: left {match.group(1)} unpatched ({error})")
+            os.remove(path)
+            continue
+        patched.append((folder + name, path))
+        say(lines, f"sideload fix added to {match.group(1)}")
+    return patched
 
 
 def required_extras(images):
@@ -306,6 +335,18 @@ def run(options, work, lines):
         for dylib in tweaks[key].dylibs:
             prepared.append((key, *prepare_dylib(dylib, stage, injected_names, lines)))
 
+    fix_name = None
+    if options.sideload_fix:
+        fix_name = "zxPluginsInject.dylib"
+        fix_stage = os.path.join(stage, "zxpi")
+        os.makedirs(fix_stage)
+        fix_source = os.path.join(fix_stage, fix_name)
+        shutil.copy2(options.sideload_fix, fix_source)
+        prepared.insert(0, ("zxpi", *prepare_dylib(fix_source, stage, injected_names, lines)))
+        say(lines, "sideload fix (keychain and App Group) will be loaded first")
+    else:
+        say(lines, "warning: no sideload fix, logging in may fail on a re-signed app")
+
     framework_images = []
     framework_sources = {}
     for key in ordered:
@@ -351,12 +392,18 @@ def run(options, work, lines):
     ))
     say(lines, f"header space left: {image.free_space} bytes")
 
+    extension_files = []
+    if fix_name and not options.strip_extensions:
+        extension_files = patch_extensions(archive, app, stage, fix_name, lines)
+
     plist_bytes = patch_plist(archive.read(app + "Info.plist"), options, "chroma" in tweaks, lines)
 
     replaced = {app + "Info.plist", app + executable}
     additions = []
     for _, path, _ in prepared:
         additions.append((f"{app}Frameworks/{os.path.basename(path)}", path, True))
+    for entry_name, path in extension_files:
+        additions.append((entry_name, path, True))
     for name, fw in framework_sources.items():
         for relative, full in walk_files(fw):
             if relative.startswith("Modules/") or relative.endswith((".swiftmodule", ".swiftdoc", ".swiftinterface")):

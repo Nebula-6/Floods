@@ -71,6 +71,15 @@ async function fetchPinned(key, pin, relays) {
   throw new Error(`could not download ${pin.label}; choose the .deb file yourself instead`);
 }
 
+async function fetchFix() {
+  const response = await fetch("zxpi/zxPluginsInject.dylib", { cache: "no-cache" });
+  if (!response.ok) {
+    post("log", "warning: the sideload fix is not published yet, building without it");
+    return null;
+  }
+  return new Blob([await response.arrayBuffer()]);
+}
+
 async function resolveDeb(key, supplied, job) {
   if (!job.include[key]) return null;
   if (supplied) return supplied;
@@ -88,6 +97,8 @@ async function build(job) {
   const blobs = [{ name: "spotify.ipa", data: job.ipa }];
   if (job.eevee) blobs.push({ name: "eevee.deb", data: job.eevee });
   if (job.chroma) blobs.push({ name: "chroma.deb", data: job.chroma });
+  const fix = job.options.sideloadFix ? await fetchFix() : null;
+  if (fix) blobs.push({ name: "zxpi.dylib", data: fix });
   pyodide.FS.mount(pyodide.FS.filesystems.WORKERFS, { blobs }, "/in");
   try {
     post("status", "Fetching helper frameworks");
@@ -99,6 +110,7 @@ async function build(job) {
       eevee: job.eevee ? "/in/eevee.deb" : null,
       chroma: job.chroma ? "/in/chroma.deb" : null,
       output: "/out/result.ipa",
+      sideloadFix: fix ? "/in/zxpi.dylib" : null,
     };
     pyodide.globals.set("job_json", JSON.stringify(request));
     const ok = await pyodide.runPythonAsync("from stackipa import web; web.run(job_json)");

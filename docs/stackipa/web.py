@@ -23,6 +23,7 @@ def run(job_json):
         force=bool(job.get("force")),
         dry_run=bool(job.get("dryRun")),
         compress=int(job.get("compress", 1)),
+        sideload_fix=job.get("sideloadFix") or None,
     )
     try:
         build(options)
