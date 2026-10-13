@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stack IPA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Stack IPA</h1>
+  <p class="lede">Combine your own Spotify IPA with the EeveeSpotify and Chroma tweak packages. Everything runs in this page. Nothing is uploaded.</p>
+
+  <section class="card">
+    <label class="pick">
+      <span>Spotify IPA <small>decrypted, from you</small></span>
+      <input type="file" id="ipa" accept=".ipa,.zip">
+      <em id="ipa-name">Choose file</em>
+    </label>
+    <label class="pick">
+      <span>EeveeSpotify <small>.deb</small></span>
+      <input type="file" id="eevee" accept=".deb">
+      <em id="eevee-name">Choose file</em>
+    </label>
+    <label class="pick">
+      <span>Chroma <small>.deb</small></span>
+      <input type="file" id="chroma" accept=".deb">
+      <em id="chroma-name">Choose file</em>
+    </label>
+  </section>
+
+  <details class="card">
+    <summary>Options</summary>
+    <label class="row"><span>App name</span><input type="text" id="name" placeholder="Spotify"></label>
+    <label class="row"><span>Bundle ID</span><input type="text" id="bundle" placeholder="leave empty to keep"></label>
+    <label class="row"><span>Load order</span>
+      <select id="order">
+        <option value="eevee,chroma">Eevee first, then Chroma</option>
+        <option value="chroma,eevee">Chroma first, then Eevee</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="strip"> Remove app extensions (helps free Apple ID signing)</label>
+    <label class="check"><input type="checkbox" id="force"> Ignore Spotify version mismatch</label>
+  </details>
+
+  <div class="buttons">
+    <button id="check" disabled>Check files</button>
+    <button id="build" class="primary" disabled>Build IPA</button>
+    <a id="download" class="button primary" hidden>Download IPA</a>
+  </div>
+
+  <p id="status" role="status">Loading Python runtime</p>
+  <pre id="log" aria-live="polite"></pre>
+
+  <p class="fine">Use only apps and files you are entitled to use. Chroma and EeveeSpotify are third-party projects with their own licenses and are not bundled here. Sign the result yourself with SideStore, Sideloadly or similar.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

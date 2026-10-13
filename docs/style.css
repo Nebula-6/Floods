@@ -1,0 +1,55 @@
+:root {
+  --bg: #f6f6f8;
+  --card: #ffffff;
+  --text: #16161a;
+  --muted: #62626e;
+  --line: #dcdce4;
+  --accent: #1a7f4b;
+  --accent-text: #ffffff;
+  --code: #eeeef3;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101013;
+    --card: #1a1a1f;
+    --text: #f1f1f4;
+    --muted: #9b9ba8;
+    --line: #2d2d35;
+    --accent: #2fb872;
+    --accent-text: #08130d;
+    --code: #141418;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { margin: 8px 0 4px; font-size: 28px; }
+.lede { color: var(--muted); margin: 0 0 20px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 16px; margin-bottom: 16px; }
+.pick { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.pick:last-child { border-bottom: 0; }
+.pick small { color: var(--muted); margin-left: 6px; }
+.pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pick em { font-style: normal; color: var(--muted); overflow-wrap: anywhere; }
+.pick.chosen em { color: var(--accent); }
+details summary { padding: 10px 0; cursor: pointer; font-weight: 600; }
+.row { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+.row input, .row select { font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+.check { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; }
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+button, .button {
+  font: inherit; font-weight: 600; padding: 12px 18px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  cursor: pointer; text-decoration: none; text-align: center; flex: 1 1 140px;
+}
+button.primary, .button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+[hidden] { display: none !important; }
+#status { font-weight: 600; margin: 8px 0; }
+#log { background: var(--code); border-radius: 12px; padding: 12px; font: 12.5px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; min-height: 56px; margin: 0 0 16px; }
+.fine { color: var(--muted); font-size: 13px; }
