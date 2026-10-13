@@ -1,6 +1,5 @@
 {
   "relays": [
-    "https://corsproxy.io/?url={url}",
     "https://api.allorigins.win/raw?url={url}",
     "https://api.codetabs.com/v1/proxy?quest={url}"
   ],
@@ -10,8 +9,8 @@
     "sha256": "513a50b197aa558c34b02b87bff9f46e6cad3b2e462ee8622fc72fd939e83a9b"
   },
   "chroma": {
-    "label": "Chroma 0.50.0",
-    "url": "https://github.com/skopevoj/spoti.pw/releases/download/v0.50.0/spoti.pw-0.50.0.deb",
-    "sha256": "238cdf3e0496070f788922182ebac655307bd9b7193c93961b8d0c943d97f746"
+    "label": "Chroma 0.51.0-beta.1",
+    "url": "https://github.com/skopevoj/spoti.pw/releases/download/v0.51.0-beta.1/spoti.pw-0.51.0-beta.1.deb",
+    "sha256": "6b86116703efd49c53a2767e727fcfb24deb67012a80063c0bbc0a9ff3b16be9"
   }
 }
