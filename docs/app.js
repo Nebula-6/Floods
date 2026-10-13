@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const files = { ipa: null, eevee: null, chroma: null };
-const worker = new Worker("worker.js");
+const worker = new Worker("worker.js?v=202610131640");
 let ready = false;
 let busy = false;
 let downloadUrl = null;
