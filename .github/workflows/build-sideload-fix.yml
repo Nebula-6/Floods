@@ -1,0 +1,64 @@
+name: Build sideload fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-sideload-fix.yml
+
+permissions:
+  contents: write
+
+env:
+  EEVEE_REF: 9b32d81073daaec4dfb47ff5b6fc63a25e0bf16f
+  THEOS: ${{ github.workspace }}/theos
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+        with:
+          path: site
+
+      - name: Checkout EeveeSpotifyReincarnated
+        uses: actions/checkout@v4
+        with:
+          repository: SideloadLabs/EeveeSpotifyReincarnated
+          ref: ${{ env.EEVEE_REF }}
+          path: eevee
+          submodules: recursive
+
+      - name: Checkout Theos
+        uses: actions/checkout@v4
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          brew install make ldid
+          echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
+
+      - name: Build zxPluginsInject
+        working-directory: eevee
+        run: |
+          chmod +x Tools/build-zxpi.sh
+          Tools/build-zxpi.sh
+          file packages/zxPluginsInject.dylib
+          otool -L packages/zxPluginsInject.dylib
+
+      - name: Publish into the site
+        run: |
+          mkdir -p site/docs/zxpi
+          cp eevee/packages/zxPluginsInject.dylib site/docs/zxpi/zxPluginsInject.dylib
+          shasum -a 256 site/docs/zxpi/zxPluginsInject.dylib | cut -d' ' -f1 > site/docs/zxpi/zxPluginsInject.sha256
+          printf 'zxPluginsInject.dylib is built from modules/zxPluginsInject in\nhttps://github.com/SideloadLabs/EeveeSpotifyReincarnated at commit %s\nLicense: GPL-3.0, source available at that commit.\n' "$EEVEE_REF" > site/docs/zxpi/SOURCE.txt
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/zxpi
+          git diff --cached --quiet && exit 0
+          git commit -m "Build zxPluginsInject from Eevee ${EEVEE_REF}"
+          git push
