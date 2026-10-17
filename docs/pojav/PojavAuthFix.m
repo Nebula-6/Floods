@@ -5,7 +5,9 @@
 typedef void (^PAFStatusBlock)(id status, BOOL success);
 typedef void (^PAFXSTSBlock)(NSString *xsts, NSString *uhs);
 
-static BOOL gHooksInstalled = NO;
+static BOOL gReportHooked = NO;
+static BOOL gXboxHooked = NO;
+static BOOL gAnnounced = NO;
 
 static NSString *PAFDescribe(NSError *error) {
     NSMutableArray *lines = [NSMutableArray arrayWithObject:error.localizedDescription ?: @"Unknown error"];
@@ -58,13 +60,14 @@ static UIViewController *PAFTopViewController(void) {
     return top;
 }
 
-static void PAFPresent(NSString *text) {
+static void PAFPresentTitled(NSString *title, NSString *text) {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIViewController *top = PAFTopViewController();
         if (top == nil) {
+            UIPasteboard.generalPasteboard.string = [NSString stringWithFormat:@"%@\n%@", title, text];
             return;
         }
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Sign-in failed"
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                        message:text
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"Copy" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -73,6 +76,10 @@ static void PAFPresent(NSString *text) {
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
         [top presentViewController:alert animated:YES completion:nil];
     });
+}
+
+static void PAFPresent(NSString *text) {
+    PAFPresentTitled(@"Sign-in failed", text);
 }
 
 static BOOL PAFHookFailureReport(void) {
@@ -120,17 +127,40 @@ static BOOL PAFHookXboxProfile(void) {
 }
 
 static void PAFInstall(void) {
-    if (gHooksInstalled) {
+    if (!gReportHooked) {
+        gReportHooked = PAFHookFailureReport();
+    }
+    if (!gXboxHooked) {
+        gXboxHooked = PAFHookXboxProfile();
+    }
+}
+
+static void PAFAnnounce(void) {
+    if (gAnnounced) {
         return;
     }
-    BOOL report = PAFHookFailureReport();
-    BOOL xbox = PAFHookXboxProfile();
-    gHooksInstalled = report && xbox;
+    gAnnounced = YES;
+    NSString *text = [NSString stringWithFormat:@"Library loaded.\nFailure report hook: %@\nXbox skip hook: %@",
+                      gReportHooked ? @"on" : @"missing", gXboxHooked ? @"on" : @"missing"];
+    PAFPresentTitled(@"PojavAuthFix", text);
+}
+
+static void PAFRetry(int attempt) {
+    PAFInstall();
+    if ((gReportHooked && gXboxHooked) || attempt >= 10) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            PAFAnnounce();
+        });
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 2)), dispatch_get_main_queue(), ^{
+        PAFRetry(attempt + 1);
+    });
 }
 
 __attribute__((constructor)) static void PAFInit(void) {
     PAFInstall();
     dispatch_async(dispatch_get_main_queue(), ^{
-        PAFInstall();
+        PAFRetry(0);
     });
 }
