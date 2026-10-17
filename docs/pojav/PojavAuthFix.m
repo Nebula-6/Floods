@@ -7,7 +7,34 @@ typedef void (^PAFXSTSBlock)(NSString *xsts, NSString *uhs);
 
 static BOOL gReportHooked = NO;
 static BOOL gXboxHooked = NO;
+static BOOL gTraceHooked = NO;
 static BOOL gAnnounced = NO;
+static BOOL gResultShown = NO;
+static NSMutableArray<NSString *> *gTrace = nil;
+static NSMutableDictionary<NSNumber *, NSMutableData *> *gBodies = nil;
+static NSObject *gTraceLock = nil;
+
+static void PAFTraceAdd(NSString *line) {
+    @synchronized (gTraceLock) {
+        [gTrace addObject:line];
+        if (gTrace.count > 40) {
+            [gTrace removeObjectAtIndex:0];
+        }
+    }
+}
+
+static NSString *PAFTraceText(void) {
+    @synchronized (gTraceLock) {
+        return gTrace.count > 0 ? [gTrace componentsJoinedByString:@"\n"] : @"no requests were recorded";
+    }
+}
+
+static void PAFTraceReset(void) {
+    @synchronized (gTraceLock) {
+        [gTrace removeAllObjects];
+        [gBodies removeAllObjects];
+    }
+}
 
 static NSString *PAFDescribe(NSError *error) {
     NSMutableArray *lines = [NSMutableArray arrayWithObject:error.localizedDescription ?: @"Unknown error"];
@@ -82,6 +109,81 @@ static void PAFPresent(NSString *text) {
     PAFPresentTitled(@"Sign-in failed", text);
 }
 
+static BOOL PAFHookTrace(void) {
+    Class cls = objc_getClass("AFURLSessionManager");
+    SEL dataSelector = NSSelectorFromString(@"URLSession:dataTask:didReceiveData:");
+    SEL doneSelector = NSSelectorFromString(@"URLSession:task:didCompleteWithError:");
+    Method data = cls ? class_getInstanceMethod(cls, dataSelector) : NULL;
+    Method done = cls ? class_getInstanceMethod(cls, doneSelector) : NULL;
+    if (data == NULL || done == NULL) {
+        return NO;
+    }
+    IMP dataOriginal = method_getImplementation(data);
+    method_setImplementation(data, imp_implementationWithBlock(^(id self, NSURLSession *session, NSURLSessionDataTask *task, NSData *chunk) {
+        @synchronized (gTraceLock) {
+            NSNumber *key = @(task.taskIdentifier);
+            NSMutableData *body = gBodies[key];
+            if (body == nil) {
+                body = [NSMutableData data];
+                gBodies[key] = body;
+            }
+            if (body.length < 1500) {
+                [body appendData:chunk];
+            }
+        }
+        ((void (*)(id, SEL, id, id, id))dataOriginal)(self, dataSelector, session, task, chunk);
+    }));
+    IMP doneOriginal = method_getImplementation(done);
+    method_setImplementation(done, imp_implementationWithBlock(^(id self, NSURLSession *session, NSURLSessionTask *task, NSError *error) {
+        NSURL *url = task.originalRequest.URL;
+        NSHTTPURLResponse *response = [task.response isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse *)task.response : nil;
+        NSString *result = response ? [NSString stringWithFormat:@"%ld", (long)response.statusCode] : (error.localizedDescription ?: @"no response");
+        NSString *line = [NSString stringWithFormat:@"%@ %@%@ -> %@", task.originalRequest.HTTPMethod ?: @"?", url.host ?: @"", url.path ?: @"", result];
+        if (response && response.statusCode >= 400) {
+            NSData *body = nil;
+            @synchronized (gTraceLock) {
+                body = [gBodies[@(task.taskIdentifier)] copy];
+            }
+            NSString *text = body.length > 0 ? [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding] : nil;
+            if (text.length > 350) {
+                text = [text substringToIndex:350];
+            }
+            if (text.length > 0) {
+                line = [line stringByAppendingFormat:@"\n   %@", text];
+            }
+        }
+        @synchronized (gTraceLock) {
+            [gBodies removeObjectForKey:@(task.taskIdentifier)];
+        }
+        PAFTraceAdd(line);
+        ((void (*)(id, SEL, id, id, id))doneOriginal)(self, doneSelector, session, task, error);
+    }));
+    return YES;
+}
+
+static BOOL PAFHookLoginStart(void) {
+    Class cls = objc_getClass("AccountListViewController");
+    SEL selector = NSSelectorFromString(@"actionLoginMicrosoft:");
+    Method method = cls ? class_getInstanceMethod(cls, selector) : NULL;
+    if (method == NULL) {
+        return NO;
+    }
+    IMP original = method_getImplementation(method);
+    method_setImplementation(method, imp_implementationWithBlock(^(id self, id sender) {
+        PAFTraceReset();
+        gResultShown = NO;
+        PAFTraceAdd(@"Microsoft login tapped");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (!gResultShown) {
+                gResultShown = YES;
+                PAFPresent([NSString stringWithFormat:@"Still no result after 45 seconds.\n\n%@", PAFTraceText()]);
+            }
+        });
+        ((void (*)(id, SEL, id))original)(self, selector, sender);
+    }));
+    return YES;
+}
+
 static BOOL PAFHookFailureReport(void) {
     Class cls = objc_getClass("AccountListViewController");
     SEL selector = NSSelectorFromString(@"callbackMicrosoftAuth:success:forCell:");
@@ -91,8 +193,9 @@ static BOOL PAFHookFailureReport(void) {
     }
     IMP original = method_getImplementation(method);
     IMP replacement = imp_implementationWithBlock(^(id self, id status, BOOL success, id cell) {
+        gResultShown = YES;
         if (!success && [status isKindOfClass:NSError.class]) {
-            PAFPresent(PAFDescribe(status));
+            PAFPresent([NSString stringWithFormat:@"%@\n\nRequests:\n%@", PAFDescribe(status), PAFTraceText()]);
         }
         ((void (*)(id, SEL, id, BOOL, id))original)(self, selector, status, success, cell);
     });
@@ -126,7 +229,15 @@ static BOOL PAFHookXboxProfile(void) {
     return YES;
 }
 
+static BOOL gLoginHooked = NO;
+
 static void PAFInstall(void) {
+    if (!gTraceHooked) {
+        gTraceHooked = PAFHookTrace();
+    }
+    if (!gLoginHooked) {
+        gLoginHooked = PAFHookLoginStart();
+    }
     if (!gReportHooked) {
         gReportHooked = PAFHookFailureReport();
     }
@@ -140,14 +251,15 @@ static void PAFAnnounce(void) {
         return;
     }
     gAnnounced = YES;
-    NSString *text = [NSString stringWithFormat:@"Library loaded.\nFailure report hook: %@\nXbox skip hook: %@",
-                      gReportHooked ? @"on" : @"missing", gXboxHooked ? @"on" : @"missing"];
+    NSString *text = [NSString stringWithFormat:@"Library loaded.\nFailure report hook: %@\nXbox skip hook: %@\nRequest log hook: %@\nLogin start hook: %@",
+                      gReportHooked ? @"on" : @"missing", gXboxHooked ? @"on" : @"missing",
+                      gTraceHooked ? @"on" : @"missing", gLoginHooked ? @"on" : @"missing"];
     PAFPresentTitled(@"PojavAuthFix", text);
 }
 
 static void PAFRetry(int attempt) {
     PAFInstall();
-    if ((gReportHooked && gXboxHooked) || attempt >= 10) {
+    if ((gReportHooked && gXboxHooked && gTraceHooked && gLoginHooked) || attempt >= 10) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             PAFAnnounce();
         });
@@ -159,6 +271,9 @@ static void PAFRetry(int attempt) {
 }
 
 __attribute__((constructor)) static void PAFInit(void) {
+    gTrace = [NSMutableArray array];
+    gBodies = [NSMutableDictionary dictionary];
+    gTraceLock = [NSObject new];
     PAFInstall();
     dispatch_async(dispatch_get_main_queue(), ^{
         PAFRetry(0);
