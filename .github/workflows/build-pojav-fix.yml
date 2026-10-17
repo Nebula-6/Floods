@@ -1,0 +1,36 @@
+name: Build Pojav auth fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - docs/pojav/PojavAuthFix.m
+      - .github/workflows/build-pojav-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile
+        run: |
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=12.2 \
+            -dynamiclib -fobjc-arc -Wall -Werror \
+            -framework Foundation -framework UIKit \
+            -install_name @rpath/PojavAuthFix.dylib \
+            -o docs/pojav/PojavAuthFix.dylib docs/pojav/PojavAuthFix.m
+          file docs/pojav/PojavAuthFix.dylib
+          otool -L docs/pojav/PojavAuthFix.dylib
+
+      - name: Publish
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/pojav/PojavAuthFix.dylib
+          git diff --cached --quiet && exit 0
+          git commit -m "Build PojavAuthFix.dylib"
+          git pull --rebase origin main
+          git push
