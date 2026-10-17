@@ -8,6 +8,7 @@ typedef void (^PAFXSTSBlock)(NSString *xsts, NSString *uhs);
 static BOOL gReportHooked = NO;
 static BOOL gXboxHooked = NO;
 static BOOL gTraceHooked = NO;
+static BOOL gCodeHooked = NO;
 static BOOL gAnnounced = NO;
 static BOOL gResultShown = NO;
 static NSMutableArray<NSString *> *gTrace = nil;
@@ -178,6 +179,46 @@ static BOOL PAFHookTrace(void) {
     return YES;
 }
 
+static NSString *PAFCleanCode(NSString *input) {
+    NSString *value = input;
+    NSRange marker = [value rangeOfString:@"code="];
+    if (marker.location != NSNotFound) {
+        value = [value substringFromIndex:NSMaxRange(marker)];
+    }
+    for (NSString *separator in @[@"&", @"#"]) {
+        NSRange cut = [value rangeOfString:separator];
+        if (cut.location != NSNotFound) {
+            value = [value substringToIndex:cut.location];
+        }
+    }
+    NSString *decoded = [value stringByRemovingPercentEncoding];
+    if (decoded.length > 0) {
+        value = decoded;
+    }
+    return [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+
+static BOOL PAFHookCodeClean(void) {
+    Class cls = objc_getClass("MicrosoftAuthenticator");
+    SEL selector = NSSelectorFromString(@"acquireAccessToken:refresh:callback:");
+    Method method = cls ? class_getInstanceMethod(cls, selector) : NULL;
+    if (method == NULL) {
+        return NO;
+    }
+    IMP original = method_getImplementation(method);
+    method_setImplementation(method, imp_implementationWithBlock(^(id self, NSString *code, BOOL refresh, id callback) {
+        NSString *use = code;
+        if (!refresh && [code isKindOfClass:NSString.class]) {
+            use = PAFCleanCode(code);
+            PAFTraceAdd([NSString stringWithFormat:@"sign-in code length %lu -> %lu", (unsigned long)code.length, (unsigned long)use.length]);
+        } else {
+            PAFTraceAdd(@"token refresh");
+        }
+        ((void (*)(id, SEL, id, BOOL, id))original)(self, selector, use, refresh, callback);
+    }));
+    return YES;
+}
+
 static BOOL PAFHookLoginStart(void) {
     Class cls = objc_getClass("AccountListViewController");
     SEL selector = NSSelectorFromString(@"actionLoginMicrosoft:");
@@ -212,8 +253,9 @@ static BOOL PAFHookFailureReport(void) {
     IMP replacement = imp_implementationWithBlock(^(id self, id status, BOOL success, id cell) {
         gResultShown = YES;
         NSString *report = nil;
-        if (!success && [status isKindOfClass:NSError.class]) {
-            report = [NSString stringWithFormat:@"%@\n\nRequests:\n%@", PAFDescribe(status), PAFTraceText()];
+        if (!success && status != nil) {
+            NSString *detail = [status isKindOfClass:NSError.class] ? PAFDescribe(status) : [status description];
+            report = [NSString stringWithFormat:@"%@\n\nRequests:\n%@", detail, PAFTraceText()];
             UIPasteboard.generalPasteboard.string = report;
             PAFPresent(report);
         }
@@ -260,6 +302,9 @@ static void PAFInstall(void) {
     if (!gTraceHooked) {
         gTraceHooked = PAFHookTrace();
     }
+    if (!gCodeHooked) {
+        gCodeHooked = PAFHookCodeClean();
+    }
     if (!gLoginHooked) {
         gLoginHooked = PAFHookLoginStart();
     }
@@ -276,15 +321,16 @@ static void PAFAnnounce(void) {
         return;
     }
     gAnnounced = YES;
-    NSString *text = [NSString stringWithFormat:@"Library loaded.\nFailure report hook: %@\nXbox skip hook: %@\nRequest log hook: %@\nLogin start hook: %@",
+    NSString *text = [NSString stringWithFormat:@"Library loaded.\nFailure report hook: %@\nXbox skip hook: %@\nRequest log hook: %@\nLogin start hook: %@\nCode fix hook: %@",
                       gReportHooked ? @"on" : @"missing", gXboxHooked ? @"on" : @"missing",
-                      gTraceHooked ? @"on" : @"missing", gLoginHooked ? @"on" : @"missing"];
+                      gTraceHooked ? @"on" : @"missing", gLoginHooked ? @"on" : @"missing",
+                      gCodeHooked ? @"on" : @"missing"];
     PAFPresentTitled(@"PojavAuthFix", text);
 }
 
 static void PAFRetry(int attempt) {
     PAFInstall();
-    if ((gReportHooked && gXboxHooked && gTraceHooked && gLoginHooked) || attempt >= 10) {
+    if ((gReportHooked && gXboxHooked && gTraceHooked && gLoginHooked && gCodeHooked) || attempt >= 10) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             PAFAnnounce();
         });
