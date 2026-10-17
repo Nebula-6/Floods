@@ -87,13 +87,28 @@ static UIViewController *PAFTopViewController(void) {
     return top;
 }
 
+static void PAFPresentWhenReady(UIAlertController *alert, int attempt) {
+    UIViewController *top = PAFTopViewController();
+    BOOL busy = top == nil || top.isBeingPresented || top.isBeingDismissed || top.transitionCoordinator != nil;
+    if (busy && attempt < 24) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC * 3 / 4)), dispatch_get_main_queue(), ^{
+            PAFPresentWhenReady(alert, attempt + 1);
+        });
+        return;
+    }
+    if (top == nil) {
+        return;
+    }
+    [top presentViewController:alert animated:YES completion:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC * 3 / 5)), dispatch_get_main_queue(), ^{
+        if (alert.presentingViewController == nil && attempt < 24) {
+            PAFPresentWhenReady(alert, attempt + 1);
+        }
+    });
+}
+
 static void PAFPresentTitled(NSString *title, NSString *text) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *top = PAFTopViewController();
-        if (top == nil) {
-            UIPasteboard.generalPasteboard.string = [NSString stringWithFormat:@"%@\n%@", title, text];
-            return;
-        }
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                        message:text
                                                                 preferredStyle:UIAlertControllerStyleAlert];
@@ -101,7 +116,9 @@ static void PAFPresentTitled(NSString *title, NSString *text) {
             UIPasteboard.generalPasteboard.string = text;
         }]];
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
-        [top presentViewController:alert animated:YES completion:nil];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            PAFPresentWhenReady(alert, 0);
+        });
     });
 }
 
@@ -194,10 +211,18 @@ static BOOL PAFHookFailureReport(void) {
     IMP original = method_getImplementation(method);
     IMP replacement = imp_implementationWithBlock(^(id self, id status, BOOL success, id cell) {
         gResultShown = YES;
+        NSString *report = nil;
         if (!success && [status isKindOfClass:NSError.class]) {
-            PAFPresent([NSString stringWithFormat:@"%@\n\nRequests:\n%@", PAFDescribe(status), PAFTraceText()]);
+            report = [NSString stringWithFormat:@"%@\n\nRequests:\n%@", PAFDescribe(status), PAFTraceText()];
+            UIPasteboard.generalPasteboard.string = report;
+            PAFPresent(report);
         }
         ((void (*)(id, SEL, id, BOOL, id))original)(self, selector, status, success, cell);
+        if (report != nil && [cell isKindOfClass:UITableViewCell.class]) {
+            UITableViewCell *row = cell;
+            row.detailTextLabel.numberOfLines = 0;
+            row.detailTextLabel.text = [PAFTraceText() stringByAppendingString:@"\n(details copied to clipboard)"];
+        }
     });
     method_setImplementation(method, replacement);
     return YES;
