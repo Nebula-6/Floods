@@ -324,7 +324,7 @@ def run(options, work, lines):
     info = plistlib.loads(archive.read(app + "Info.plist"))
     executable = info.get("CFBundleExecutable")
     version = info.get("CFBundleShortVersionString", "unknown")
-    say(lines, f"Spotify {version} ({info.get('CFBundleIdentifier')}), executable {executable}")
+    say(lines, f"{info.get('CFBundleName') or info.get('CFBundleIdentifier')} {version} ({info.get('CFBundleIdentifier')}), executable {executable}")
     if executable is None or app + executable not in archive.namelist():
         raise BuildError("could not find the main executable named in Info.plist")
 
@@ -374,7 +374,7 @@ def run(options, work, lines):
         shutil.copy2(options.sideload_fix, fix_source)
         prepared.insert(0, ("zxpi", *prepare_dylib(fix_source, stage, injected_names, lines)))
         say(lines, "sideload fix (keychain and App Group) will be loaded first")
-    else:
+    elif tweaks:
         say(lines, "no sideload fix added (right for LiveContainer, needed when you sign with your own certificate)")
 
     framework_images = []
