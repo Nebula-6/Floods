@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pojav Auth Fix</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<main>
+  <h1>Pojav Auth Fix</h1>
+  <p class="lede">Adds a small library to the PojavLauncher v2.2 IPA. It shows exactly which Microsoft sign-in step fails, and skips the Xbox profile steps that Android does not use. Your IPA never leaves this device.</p>
+
+  <section class="card">
+    <label class="pick">
+      <span>PojavLauncher IPA <small>net.kdt.pojavlauncher-2.2-ios.ipa</small></span>
+      <input type="file" id="ipa" accept=".ipa,.zip">
+      <em id="ipa-name">Choose file</em>
+    </label>
+  </section>
+
+  <div class="buttons">
+    <button id="check" disabled>Check file</button>
+    <button id="build" class="primary" disabled>Patch IPA</button>
+    <a id="download" class="button primary" hidden>Download IPA</a>
+  </div>
+
+  <p id="hint" class="fine"></p>
+  <p id="status" role="status">Loading Python runtime</p>
+  <pre id="log" aria-live="polite"></pre>
+</main>
+<script src="app.js?v=1"></script>
+</body>
+</html>

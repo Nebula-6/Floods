@@ -17,7 +17,7 @@ jobs:
 
       - name: Compile
         run: |
-          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=12.2 \
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=14.0 \
             -dynamiclib -fobjc-arc -Wall -Werror \
             -framework Foundation -framework UIKit \
             -install_name @rpath/PojavAuthFix.dylib \

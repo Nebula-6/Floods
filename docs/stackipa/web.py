@@ -24,6 +24,7 @@ def run(job_json):
         dry_run=bool(job.get("dryRun")),
         compress=int(job.get("compress", 1)),
         sideload_fix=job.get("sideloadFix") or None,
+        extra_dylibs=tuple(job.get("extraDylibs") or ()),
     )
     try:
         build(options)

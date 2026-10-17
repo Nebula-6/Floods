@@ -54,6 +54,7 @@ class Options:
     compress: int = 6
     work_dir: str = None
     sideload_fix: str = None
+    extra_dylibs: tuple = ()
 
 
 def say(lines, text):
@@ -299,8 +300,8 @@ def copy_raw(source, entry, out):
 
 def build(options):
     lines = []
-    if not (options.eevee or options.chroma):
-        raise BuildError("give at least one of --eevee or --chroma")
+    if not (options.eevee or options.chroma or options.extra_dylibs):
+        raise BuildError("give at least one of --eevee, --chroma or --extra-dylib")
     for label in ("ipa", "eevee", "chroma"):
         value = getattr(options, label)
         if value and not os.path.isfile(value):
@@ -355,6 +356,14 @@ def run(options, work, lines):
     for key in ordered:
         for dylib in tweaks[key].dylibs:
             prepared.append((key, *prepare_dylib(dylib, stage, injected_names, lines)))
+
+    for extra in options.extra_dylibs:
+        extra_stage = os.path.join(stage, "extra", str(len(prepared)))
+        os.makedirs(extra_stage)
+        extra_source = os.path.join(extra_stage, os.path.basename(extra))
+        shutil.copy2(extra, extra_source)
+        prepared.append(("extra", *prepare_dylib(extra_source, stage, injected_names, lines)))
+        say(lines, f"added {os.path.basename(extra)}")
 
     fix_name = None
     if options.sideload_fix:
