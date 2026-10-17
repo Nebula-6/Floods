@@ -270,6 +270,16 @@ static BOOL PAFHookFailureReport(void) {
     return YES;
 }
 
+static void PAFFallbackGamertag(id authenticator) {
+    if (![authenticator respondsToSelector:NSSelectorFromString(@"authData")]) {
+        return;
+    }
+    NSMutableDictionary *data = [authenticator valueForKey:@"authData"];
+    if ([data isKindOfClass:NSMutableDictionary.class] && data[@"xboxGamertag"] == nil) {
+        data[@"xboxGamertag"] = @"Microsoft";
+    }
+}
+
 static BOOL PAFHookXboxProfile(void) {
     Class cls = objc_getClass("MicrosoftAuthenticator");
     if (cls == nil) {
@@ -282,16 +292,39 @@ static BOOL PAFHookXboxProfile(void) {
     if (profile == NULL || xsts == NULL) {
         return NO;
     }
+    IMP profileOriginal = method_getImplementation(profile);
     method_setImplementation(profile, imp_implementationWithBlock(^(id self, NSString *uhs, NSString *token, PAFStatusBlock callback) {
-        callback(nil, YES);
-    }));
-    IMP original = method_getImplementation(xsts);
-    method_setImplementation(xsts, imp_implementationWithBlock(^(id self, NSString *party, NSString *token, PAFXSTSBlock xstsCallback, PAFStatusBlock callback) {
-        if ([party hasPrefix:@"http://xboxlive.com"]) {
-            xstsCallback(@"skipped", @"skipped");
+        if (token.length == 0) {
+            PAFFallbackGamertag(self);
+            callback(nil, YES);
             return;
         }
-        ((void (*)(id, SEL, id, id, id, id))original)(self, xstsSelector, party, token, xstsCallback, callback);
+        PAFStatusBlock soft = ^(id status, BOOL success) {
+            if (!success) {
+                PAFTraceAdd(@"xbox profile failed, continuing without it");
+                PAFFallbackGamertag(self);
+                callback(nil, YES);
+                return;
+            }
+            callback(status, success);
+        };
+        ((void (*)(id, SEL, id, id, id))profileOriginal)(self, profileSelector, uhs, token, soft);
+    }));
+    IMP xstsOriginal = method_getImplementation(xsts);
+    method_setImplementation(xsts, imp_implementationWithBlock(^(id self, NSString *party, NSString *token, PAFXSTSBlock xstsCallback, PAFStatusBlock callback) {
+        if ([party hasPrefix:@"http://xboxlive.com"]) {
+            PAFStatusBlock soft = ^(id status, BOOL success) {
+                if (!success) {
+                    PAFTraceAdd(@"xbox profile sign-in failed, continuing without it");
+                    xstsCallback(@"", @"");
+                    return;
+                }
+                callback(status, success);
+            };
+            ((void (*)(id, SEL, id, id, id, id))xstsOriginal)(self, xstsSelector, party, token, xstsCallback, soft);
+            return;
+        }
+        ((void (*)(id, SEL, id, id, id, id))xstsOriginal)(self, xstsSelector, party, token, xstsCallback, callback);
     }));
     return YES;
 }
